@@ -1,0 +1,1027 @@
+<head>
+  <meta charset="UTF-8">
+  <title>電子ストリップ 完全統合⑦.2 スタンプ選択表示版</title>
+  <style>
+    body { margin: 0; background-color: #222; color: #fff; font-family: sans-serif; }
+
+    .wrapper {
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .main {
+      display: flex;
+      height: 100vh;
+      flex: 1;
+    }
+
+    .left, .center, .right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #555;
+      overflow: hidden;
+    }
+
+    .area-label, .active-rwy-label, .move-history-area {
+      text-align: center; padding: 5px; font-weight: bold; font-size: 14px;
+    }
+    .area-label { background-color: #007BFF; }
+    .active-rwy-label { background-color: #007BFF; }
+    .move-history-area { background-color: #3399FF; cursor: pointer; }
+
+    .rwy36-dropzone {
+      background-color: rgba(255,255,0,0.8);
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: center;
+      overflow-y: auto;
+      transition: height 0.3s ease;
+      padding: 10px;
+    }
+
+    .rwy36-label {
+      color: red; font-weight: bold; font-size: 20px; margin-bottom: 5px;
+    }
+
+    .top-dropzone {
+      background-color: #222;
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    /* ドラッグしているときのガイド線 */
+    .top-dropzone .sortable-ghost {
+      opacity: 0.4;
+    }
+
+    .top-dropzone .sortable-chosen {
+      opacity: 0.7;
+    }
+
+    .top-dropzone .sortable-ghost::after {
+      content: "";
+      display: block;
+      height: 4px;
+      background-color: #66CCFF;  /* 水色のガイド線 */
+      margin-top: -4px;
+    }
+
+    .slot {
+      height: 80px;
+      margin: 0;
+      position: relative;
+    }
+
+    .dropzone, .自由配置本体, .AWAITING本体, .履歴本体 {
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      overflow-y: auto;
+      height: 100%;
+    }
+
+    .strip {
+      display: flex;
+      background-color: #f8f8f8;
+      color: #000;
+      border: 1px solid #999;
+      margin: 0 auto;
+      height: 80px;
+      width: 100%;
+      position: static;
+      cursor: grab;
+    }
+
+    .orange-bar, .green-bar { width: 8px; }
+    .orange-bar { background-color: #FFA500; }
+    .green-bar { background-color: #32CD32; }
+   /* ★ 追加：新タイプ用のバー色 */
+.ovr-bar, .ifr-arr-bar, .ifr-dep-bar { width: 8px; }
+.ovr-bar     { background-color: #90EE90; } /* OVR：DEPより薄い黄緑 */
+.ifr-arr-bar { background-color: #FFE08A; } /* IFR ARR：ARRより薄い黄色 */
+.ifr-dep-bar { background-color: #66CCFF; } /* IFR DEP：水色 */
+
+    .strip-content {
+      flex: 1;
+      display: flex;
+    }
+
+    .left-section {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #999;
+    }
+
+    .callsign {
+      flex: 7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .bottom-left {
+      flex: 3;
+      display: flex;
+    }
+
+    .aircraft-type, .eobt {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 18px;
+    }
+
+    .right-section {
+      flex: 7;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .runway {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      font-size: 30px;
+      font-weight: bold;
+    }
+
+    .destination {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .spot {
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+      font-size: 30px;
+      font-weight: bold;
+    }
+
+/* ★ 追加：ROUTE 表示（右側領域の中央上） */
+.route {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* ★ 追加：REQ ALT（右側領域の中央上、ROUTE の下） */
+.req-alt {
+  position: absolute;
+  top: 24px;          /* ROUTE(top:5px) の少し下に配置 */
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+
+    .arrival-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #FFA500;
+      color: #000;
+      border: 1px solid #999;
+      height: 50px;
+      width: 100%;
+      font-size: 22px;
+      font-weight: bold;
+      position: static;
+      margin: 5px 0;
+      cursor: grab;
+    }
+
+    .plan-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #f8f8f8;
+      color: #000;
+      border: 1px solid #999;
+      margin: 5px;
+      flex: 0 0 calc(100% / 4 - 10px);
+      height: 60px;
+      width: 30%;
+      position: relative;
+    }
+
+    .stamp-zone {
+      position: absolute;
+      inset: 0;
+    }
+
+    .stamp-circle {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 10px;
+    }
+
+    .stamp-circle svg {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      stroke: white;
+      stroke-width: 2px;
+      fill: none;
+    }
+
+    .stamp-LND {
+      width: 28px;
+      height: 28px;
+      position: absolute;
+      transform: translate(-50%, -50%);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      color: white;
+      font-size: 10px;
+      padding: 2px;
+    }
+
+    .stamp-LND .check { font-size: 14px; line-height: 1; }
+    .stamp-LND .label { font-size: 10px; line-height: 1; margin-top: 1px; }
+
+    .stamp-ATA {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 50px;
+      height: 26px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px;
+      font-weight: bold;
+      color: white;
+      font-size: 10px;
+    }
+
+    .stamp-ATA .label { font-size: 11px; }
+    .stamp-ATA .time-box {
+      width: 90%;
+      height: 12px;
+      border-radius: 4px;
+      background-color: #aaa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #000;
+      font-size: 10px;
+    }
+
+    .stamp-menu-left {
+      width: 50px;
+      background: #333;
+      display: flex;
+      flex-direction: column;
+      padding: 5px;
+      gap: 5px;
+    }
+
+    .stamp-menu-right {
+      width: 50px;
+      background: #333;
+      display: flex;
+      flex-direction: column;
+      padding: 5px;
+      gap: 5px;
+    }
+
+    .stamp-button {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      cursor: pointer;
+      padding: 4px;
+      color: white;
+      transition: all 0.2s;
+    }
+
+    .stamp-gray { background-color: #444; }
+    .stamp-orange { background-color: #FFA500; }
+    .stamp-blue { background-color: #66CCFF; }
+
+    /* ★ 選択中スタンプ用の強調 */
+    .stamp-button.selected {
+      box-shadow: 0 0 5px 3px #fff;
+      transform: scale(1.05);
+    }
+
+    .header { background: #333; padding: 10px; }
+
+    .form-container {
+      background: #444;
+      padding: 10px;
+      display: none;
+    }
+
+    .form-container input, .form-container select {
+      margin: 3px;
+    }
+
+    button { font-size: 16px; padding: 5px 10px; }
+
+    .予定機リスト {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      padding: 5px;
+      align-content: flex-start;
+    }
+
+    .stamp-section {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 5px 0;
+      border-bottom: 1px solid white;
+    }
+    .stamp-section:last-child {
+      border-bottom: none;
+    }
+
+    .stamp-T2 {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      padding: 2px 8px;
+      border: 2px solid #66CCFF;  /* 青色のフチ */
+      border-radius: 6px;
+      color: #66CCFF;  /* 青色の文字 */
+      font-weight: bold;
+      font-size: 14px;
+      background-color: transparent; /* 透明背景 */
+    }
+
+.bottom-center {
+    height: 200px; /* ← ここがポイント！ 例えば200pxくらい仮に指定する */
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid #555;
+    position: relative;
+}
+
+.AWAITING本体 {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 10px;  /* padding-bottom はもういらない */
+}
+
+  /* ▼ フォルダメニュー用 */
+.folder-menu {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  padding-left: 4px;
+  margin-top: 4px;
+  border-left: 2px dotted #777;
+}
+
+/* フォルダを開いているときの見た目（必要に応じて） */
+.folder-open > .folder-menu {
+  display: flex;
+}
+
+/* OTHERSボタン（任意で少し区別） */
+.stamp-folder {
+  background-color: #555; /* 既存のstamp-grayに近い色味 */
+}
+
+/* RLS▶ スタンプ（右メニュー用の青系ラベル） */
+.stamp-RLS {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 2px 8px;
+  border: 2px solid #66CCFF;
+  border-radius: 6px;
+  color: #66CCFF;
+  font-weight: bold;
+  font-size: 14px;
+  background-color: transparent;
+}
+
+/* ★ 追加：メニュー用 赤ボタン */
+.stamp-red { background-color: #FF4D4D; }
+
+/* ★ 追加：ATD風・正方形スタンプ（GA/MA用） */
+.stamp-ATD-square {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 34px;               /* 正方形 */
+  height: 34px;              /* 正方形 */
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px;
+  font-weight: bold;
+  color: white;
+  font-size: 10px;
+  background-color: #FF4D4D; /* 赤（上書きも可） */
+}
+.stamp-ATD-square .label {
+  font-size: 10px;
+  line-height: 1;
+}
+.stamp-ATD-square .time-box {
+  width: 85%;
+  height: 12px;
+  border-radius: 4px;
+  background-color: #aaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* ★ 追加：時刻なし／中央に文字だけの赤い正方形スタンプ（GA/MA用） */
+.stamp-square-red {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #FF4D4D; /* 赤 */
+  color: #fff;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+
+
+  </style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="header">
+  <button onclick="document.getElementById('form').style.display='block'">新規ストリップ作成</button>
+  <div id="form" class="form-container">
+    Callsign: <input id="cs" size="8">
+    Type: <input id="type" size="6">
+    EOBT: <input id="eobt" size="4">
+    Dest: <input id="dest" size="4">
+    ROUTE: <input id="route" size="4">
+    REQ ALT: <input id="reqalt" size="4">
+    RWY: <input id="rwy" size="2">
+    Spot: <input id="spot" size="3">
+    ARR/DEP: 
+    <select id="arrdep">
+      <option value="DEP">DEP</option>
+      <option value="ARR">ARR</option>
+  <option value="OVR">OVR</option>         <!-- ★ 追加 -->
+  <option value="IFR ARR">IFR ARR</option> <!-- ★ 追加 -->
+  <option value="IFR DEP">IFR DEP</option> <!-- ★ 追加 -->
+    </select>
+    <button onclick="addStrip()">作成</button>
+  </div>
+  <input type="file" id="fileInput" accept=".json" style="margin-left:10px;" onchange="loadStripsFromFile(event)">
+</div>
+
+<!-- wrapper -->
+<div class="wrapper">
+
+<!-- 左側スタンプメニュー -->
+<div class="stamp-menu-left">
+  
+  <!-- 上段 -->
+  <div class="stamp-section">
+    <div class="stamp-button stamp-gray" id="stamp-FREE WRITE" onclick="selectStamp('FREE WRITE', 'left')">FREE<br>WRITE</div>
+    <div class="stamp-button stamp-gray" id="stamp-TEMPLATE" onclick="selectStamp('TEMPLATE', 'left')">TEMPLATE</div>
+  </div>
+
+  <!-- 中段 -->
+  <div class="stamp-section">
+    <div class="stamp-button stamp-orange" id="stamp-NW" onclick="selectStamp('NW', 'left')">NW</div>
+    <div class="stamp-button stamp-orange" id="stamp-W" onclick="selectStamp('W', 'left')">W</div>
+    <div class="stamp-button stamp-orange" id="stamp-SW" onclick="selectStamp('SW', 'left')">SW</div>
+ 
+    <!-- ▼ 追加：OTHERS フォルダ -->
+    <div id="others-folder-left" class="stamp-button stamp-folder" onclick="toggleFolder('left')">OTHERS</div>
+    <div id="others-menu-left" class="folder-menu">
+      <div class="stamp-button stamp-orange" id="stamp-N"  onclick="selectStamp('N',  'left')">N</div>
+      <div class="stamp-button stamp-orange" id="stamp-NE" onclick="selectStamp('NE', 'left')">NE</div>
+      <div class="stamp-button stamp-orange" id="stamp-E"  onclick="selectStamp('E',  'left')">E</div>
+      <div class="stamp-button stamp-orange" id="stamp-SE" onclick="selectStamp('SE', 'left')">SE</div>
+      <div class="stamp-button stamp-red" id="stamp-GA" onclick="selectStamp('GA', 'left')">GA</div>
+      <div class="stamp-button stamp-red" id="stamp-MA" onclick="selectStamp('MA', 'left')">MA</div>
+    </div>
+  </div>
+
+  <!-- 下段 -->
+  <div class="stamp-section">
+    <div class="stamp-button stamp-orange" id="stamp-LND" onclick="selectStamp('LND', 'left')">LND</div>
+    <div class="stamp-button stamp-orange" id="stamp-ATA" onclick="selectStamp('ATA', 'left')">ATA</div>
+    <div class="stamp-button stamp-gray" id="stamp-CANCEL" onclick="selectStamp('CANCEL', 'left')">CANCEL</div>
+  </div>
+
+</div>
+
+<!-- メイン3カラム -->
+<div class="main">
+
+  <!-- 左エリア -->
+  <div class="left">
+    <div class="left-container" style="display: flex; flex-direction: column-reverse; height: 100%;">
+      <div class="active-rwy-label">ACTIVE RWY</div>
+      <div id="MOVE_TO_HISTORY" class="move-history-area">MOVE TO HISTORY</div>
+      <div id="RWY36_DROPZONE" class="rwy36-dropzone">
+        <div class="rwy36-label">RWY36</div>
+      </div>
+      <div id="TOP_DROPZONE" class="top-dropzone"></div>
+    </div>
+  </div>
+
+  <!-- 中央エリア -->
+  <div class="center">
+    <div class="top-center" style="flex:1; border-bottom:1px solid #555; position:relative;">
+      <div class="area-label">自由配置エリア</div>
+      <div class="自由配置本体" id="自由配置エリア"></div>
+    </div>
+    <div class="bottom-center" style="flex:1; border-bottom:1px solid #555; position:relative;">
+      <div class="area-label">AWAITINGエリア</div>
+      <div class="AWAITING本体" id="AWAITINGエリア"></div>
+    </div>
+  </div>
+
+  <!-- 右エリア -->
+  <div class="right">
+    <div class="property" style="flex:2;">
+      <div class="area-label">プロパティエリア</div>
+    </div>
+    <div class="plan-history" style="flex:2; display:flex; flex-direction:column;">
+      <div class="plan" style="flex:1;">
+        <div class="area-label">予定機エリア</div>
+        <div class="予定機リスト dropzone" id="予定機エリア"></div>
+      </div>
+      <div class="history" style="flex:1;">
+        <div class="area-label">履歴エリア</div>
+        <div class="履歴本体" id="履歴エリア"></div>
+      </div>
+    </div>
+  </div>
+
+</div> <!-- /.main -->
+
+<!-- 右側スタンプメニュー -->
+<div class="stamp-menu-right">
+
+  <!-- 上段 -->
+  <div class="stamp-section">
+    <!-- 空欄 -->
+  </div>
+
+<!-- 中段 -->
+<div class="stamp-section">
+  <div class="stamp-button stamp-blue" id="stamp-NW-right" onclick="selectStamp('NW', 'right')">NW</div>
+  <div class="stamp-button stamp-blue" id="stamp-W-right" onclick="selectStamp('W', 'right')">W</div>
+  <div class="stamp-button stamp-blue" id="stamp-SW-right" onclick="selectStamp('SW', 'right')">SW</div>
+
+  <!-- ▼ 追加：OTHERS フォルダ -->
+  <div id="others-folder-right" class="stamp-button stamp-folder" onclick="toggleFolder('right')">OTHERS</div>
+  <div id="others-menu-right" class="folder-menu">
+    <div class="stamp-button stamp-blue" id="stamp-N-right"  onclick="selectStamp('N',  'right')">N</div>
+    <div class="stamp-button stamp-blue" id="stamp-NE-right" onclick="selectStamp('NE', 'right')">NE</div>
+    <div class="stamp-button stamp-blue" id="stamp-E-right"  onclick="selectStamp('E',  'right')">E</div>
+    <div class="stamp-button stamp-blue" id="stamp-SE-right" onclick="selectStamp('SE', 'right')">SE</div>
+  </div>
+
+  <div class="stamp-button stamp-blue" id="stamp-T2-right" onclick="selectStamp('T2', 'right')">T2</div> <!--★ これを追加！ -->
+</div>
+
+  <!-- 下段 -->
+  <div class="stamp-section">
+    <div class="stamp-button stamp-blue" id="stamp-RLS▶-right" onclick="selectStamp('RLS▶', 'right')">RLS▶</div>
+    <div class="stamp-button stamp-blue" id="stamp-T/O-right" onclick="selectStamp('T/O', 'right')">T/O</div>
+    <div class="stamp-button stamp-blue" id="stamp-ATD-right" onclick="selectStamp('ATD', 'right')">ATD</div>
+    <div class="stamp-button stamp-gray" id="stamp-GND→-right" onclick="selectStamp('GND→', 'right')">GND→</div>
+  </div>
+
+</div>
+
+</div> <!-- /.wrapper -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script>
+
+let currentStamp = null;
+let currentOrigin = null;
+
+function selectStamp(stampName, origin) {
+  // すべての stamp-button から selected クラス除去
+  document.querySelectorAll('.stamp-button').forEach(btn => btn.classList.remove('selected'));
+
+  // 押したボタンに selected クラス付与
+  if (origin === 'left') {
+    document.getElementById(`stamp-${stampName}`)?.classList.add('selected');
+  } else if (origin === 'right') {
+    if (stampName === 'T/O') {
+      document.getElementById('stamp-T/O-right')?.classList.add('selected');
+    } else if (stampName === 'GND→') {
+      document.getElementById('stamp-GND→-right')?.classList.add('selected');
+    } else {
+      document.getElementById(`stamp-${stampName}-right`)?.classList.add('selected');
+    }
+  }
+
+  // スタンプ選択状態を保存
+  currentStamp = stampName;
+  currentOrigin = origin;
+  console.log("選択中スタンプ:", currentStamp, " from:", currentOrigin);
+}
+
+const optionsNormal = {
+  group: 'shared',
+  animation: 150,
+  onAdd: handleDrop,
+  onRemove: handleDrop
+};
+
+['自由配置エリア','AWAITINGエリア','予定機エリア','履歴エリア','RWY36_DROPZONE','MOVE_TO_HISTORY'].forEach(id => {
+  new Sortable(document.getElementById(id), optionsNormal);
+});
+
+new Sortable(document.getElementById('TOP_DROPZONE'), {
+  group: 'shared',
+  animation: 150
+});
+
+
+function handleDrop(evt) {
+  const item = evt.item;
+  const to = evt.to.id;
+
+  if(item.dataset.type === "ARRIVAL_MARKER") return;
+
+  const type = item.dataset.type || 'DEP';
+  const callsign = item.dataset.callsign || item.querySelector('.callsign')?.innerText || item.innerText.trim() || '';
+
+  const existingStampZone = item.querySelector('.stamp-zone');
+  let savedStamps = [];
+  if (existingStampZone) {
+    savedStamps = Array.from(existingStampZone.children).map(child => child.outerHTML);
+  }
+
+  if (to === "予定機エリア") {
+  
+let bars = getPlanBarsByType(type);
+
+    item.innerHTML = `${bars}<div style="font-weight:bold;font-size:20px;text-align:center;">${callsign}</div>`;
+    item.style.position = 'relative';
+    item.style.height = '60px';
+    item.style.width = '30%';
+    item.style.border = '1px solid #999';
+    item.style.backgroundColor = '#f8f8f8';
+    item.style.margin = '5px';
+    item.className = 'plan-strip';
+    item.dataset.callsign = callsign;
+    item.dataset.type = type;
+  }
+  else {
+    let bars = getBarClassByType(type);
+
+    const acType = item.dataset.acType || '';
+    const eobt = item.dataset.eobt || '';
+    const dest = item.dataset.dest || '';
+    const route = item.dataset.route || '';
+    const reqAlt = item.dataset.reqAlt || '';
+    const rwy = item.dataset.rwy || '';
+    const spot = item.dataset.spot || '';
+
+    item.innerHTML = `<div class="${bars}"></div>
+      <div class="strip-content" onclick="handleStripClick(event, this)">
+        <div class="left-section"><div class="callsign">${callsign}</div>
+        <div class="bottom-left"><div class="aircraft-type">${acType}</div><div class="eobt">${eobt}</div></div></div>
+        <div class="right-section">
+          <div class="runway">${rwy}</div>
+          <div class="route">${route}</div> 
+          <div class="req-alt">${reqAlt}</div> 
+          <div class="destination">${dest}</div>
+          <div class="spot">${spot}</div>
+          <div class="stamp-zone" style="position:absolute; inset:0;"></div>
+        </div>
+      </div>
+      <div class="${bars}"></div>`;
+    item.className = 'strip';
+    item.style.height = '80px';
+    item.style.width = '100%';
+    item.style.margin = '5px 0';
+    item.dataset.callsign = callsign;
+    item.dataset.acType = acType;
+    item.dataset.eobt = eobt;
+    item.dataset.dest = dest;
+    item.dataset.route = route;
+    item.dataset.reqAlt = reqAlt;
+    item.dataset.rwy = rwy;
+    item.dataset.spot = spot;
+    const newZone = item.querySelector('.stamp-zone');
+    savedStamps.forEach(html => {
+      newZone.insertAdjacentHTML('beforeend', html);
+    });
+  }
+
+  if (to === "MOVE_TO_HISTORY") {
+    document.getElementById('履歴エリア').appendChild(item);
+  }
+
+  adjustRwy36Height();
+}
+
+function handleStripClick(e, target) {
+  if (!currentStamp) return;
+  if (!target.classList.contains('strip-content')) return;
+
+  const stripElement = target.closest('.strip');
+  const zone = target.querySelector('.stamp-zone');
+  if (!zone) return;
+
+  const rect = zone.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (currentStamp === 'GND→') {
+    document.getElementById('履歴エリア').appendChild(stripElement);
+    clearStampSelection();
+    return;
+  }
+
+  if (currentStamp === 'CANCEL') {
+    const clicked = Array.from(zone.children).find(child => {
+      const cRect = child.getBoundingClientRect();
+      return e.clientX >= cRect.left && e.clientX <= cRect.right && e.clientY >= cRect.top && e.clientY <= cRect.bottom;
+    });
+    if (clicked) clicked.remove();
+    clearStampSelection();
+    return;
+  }
+
+  const stamp = document.createElement("div");
+  let bgColor = (currentOrigin === 'left') ? '#FFA500' : '#66CCFF';
+
+  if (['NW','W','SW','N','NE','E','SE'].includes(currentStamp)) {
+    stamp.className = 'stamp-circle';
+    stamp.style.backgroundColor = bgColor;
+    stamp.innerText = currentStamp;
+  }
+  else if (currentStamp === 'LND' || currentStamp === 'T/O') {
+    stamp.className = 'stamp-LND';
+    stamp.style.backgroundColor = bgColor;
+    const labelText = (currentStamp === 'T/O') ? 'T/O' : 'LND';
+    stamp.innerHTML = `
+      <div class="check">✓</div>
+      <div class="label">${labelText}</div>`;
+  }
+  else if (currentStamp === 'ATA' || currentStamp === 'ATD') {
+    stamp.className = 'stamp-ATA';
+    stamp.style.backgroundColor = bgColor;
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const timeStr = hh + mm;
+    const labelText = (currentStamp === 'ATD') ? 'ATD' : 'ATA';
+    stamp.innerHTML = `
+      <div class="label">${labelText}</div>
+      <div class="time-box">${timeStr}</div>`;
+  }
+
+  else if (currentStamp === 'T2') {
+    stamp.className = 'stamp-T2';
+    stamp.innerText = 'T2';
+  }
+
+else if (currentStamp === 'GA' || currentStamp === 'MA') {  // ★ 修正
+  stamp.className = 'stamp-square-red';
+  stamp.textContent = currentStamp;  // 中央に GA / MA のみ表示
+}
+
+
+  else if (currentStamp === 'RLS▶') {  // ★ 追加
+    stamp.className = 'stamp-RLS';
+    stamp.innerText = 'RLS▶';
+  }
+
+  stamp.style.left = `${x}px`;
+  stamp.style.top = `${y}px`;
+  zone.appendChild(stamp);
+
+  clearStampSelection();
+}
+
+function clearStampSelection() {
+  document.querySelectorAll('.stamp-button').forEach(btn => btn.classList.remove('selected'));
+  currentStamp = null;
+  currentOrigin = null;
+}
+
+function adjustRwy36Height() {
+  const dropzone = document.getElementById('RWY36_DROPZONE');
+  const count = dropzone.querySelectorAll('.strip, .plan-strip').length;
+  const height = (80 * count) + 10 + 40;
+  dropzone.style.height = (height > 100 ? height : 100) + "px";
+}
+
+function addStrip() {
+  const cs = document.getElementById('cs').value || '';
+  const typeText = document.getElementById('type').value || '';
+  const eobt = document.getElementById('eobt')?.value || '';
+  const dest = document.getElementById('dest')?.value || '';
+  const route = document.getElementById('route')?.value || '';  
+  const reqAlt = document.getElementById('reqalt')?.value || '';
+  const rwy = document.getElementById('rwy')?.value || '';
+  const spot = document.getElementById('spot')?.value || '';
+  const arrdep = document.getElementById('arrdep').value || '';
+
+  const strip = document.createElement("div");
+  strip.className = 'strip';
+  strip.dataset.callsign = cs;
+  strip.dataset.type = arrdep;
+  strip.dataset.acType = typeText;
+  strip.dataset.eobt = eobt;
+  strip.dataset.dest = dest;
+  strip.dataset.route = route;
+  strip.dataset.reqAlt = reqAlt;
+  strip.dataset.rwy = rwy;
+  strip.dataset.spot = spot;
+
+  let bars = getBarClassByType(arrdep);
+  strip.innerHTML = `
+    <div class="${bars}"></div>
+    <div class="strip-content" onclick="handleStripClick(event, this)">
+      <div class="left-section">
+        <div class="callsign">${cs}</div>
+        <div class="bottom-left">
+          <div class="aircraft-type">${typeText}</div>
+          <div class="eobt">${eobt}</div>
+        </div>
+      </div>
+      <div class="right-section">
+        <div class="runway">${rwy}</div>
+        <div class="route">${route}</div> 
+        <div class="req-alt">${reqAlt}</div>
+        <div class="destination">${dest}</div>
+        <div class="spot">${spot}</div>
+        <div class="stamp-zone" style="position:absolute; inset:0;"></div>
+      </div>
+    </div>
+    <div class="${bars}"></div>`;
+
+  document.getElementById('自由配置エリア').appendChild(strip);
+  adjustRwy36Height();
+}
+
+adjustRwy36Height();
+
+const topDrop = document.getElementById('TOP_DROPZONE');
+
+const arrival = document.createElement("div");
+arrival.className = 'arrival-marker';
+arrival.innerText = "ARRIVAL";
+arrival.dataset.type = "ARRIVAL_MARKER";
+
+topDrop.appendChild(arrival);
+
+new Sortable(topDrop, {
+  group: 'shared',
+  animation: 150
+});
+
+function loadStripsFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const json = JSON.parse(e.target.result);
+      if (!Array.isArray(json)) throw new Error("JSON形式が配列ではありません。");
+
+      json.forEach(data => {
+        const strip = document.createElement("div");
+        strip.className = 'strip';
+        strip.dataset.callsign = data.callsign || '';
+        strip.dataset.type = data.arrdep || 'DEP';
+        strip.dataset.acType = data.type || '';
+        strip.dataset.eobt = data.eobt || '';
+        strip.dataset.dest = data.dest || '';
+        strip.dataset.route = data.route || ''; 
+        strip.dataset.reqAlt = data.reqAlt || '';
+        strip.dataset.rwy = data.rwy || '';
+        strip.dataset.spot = data.spot || '';
+
+        let bars = getBarClassByType(data.arrdep);
+
+        strip.innerHTML = `
+          <div class="${bars}"></div>
+          <div class="strip-content" onclick="handleStripClick(event, this)">
+            <div class="left-section">
+              <div class="callsign">${data.callsign || ''}</div>
+              <div class="bottom-left">
+                <div class="aircraft-type">${data.type || ''}</div>
+                <div class="eobt">${data.eobt || ''}</div>
+              </div>
+            </div>
+            <div class="right-section">
+              <div class="runway">${data.rwy || ''}</div>
+              <div class="route">${data.route || ''}</div>
+              <div class="req-alt">${data.reqAlt}</div> 
+              <div class="destination">${data.dest || ''}</div>
+              <div class="spot">${data.spot || ''}</div>
+              <div class="stamp-zone" style="position:absolute; inset:0;"></div>
+            </div>
+          </div>
+          <div class="${bars}"></div>`;
+
+        document.getElementById('自由配置エリア').appendChild(strip);
+      });
+
+      adjustRwy36Height();
+
+    } catch (err) {
+      alert("ファイルの読み込みに失敗しました：" + err.message);
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+function toggleFolder(side) {
+  if (side === 'left') {
+    const menu = document.getElementById('others-menu-left');
+    menu.style.display = (menu.style.display === 'flex') ? 'none' : 'flex';
+  } else if (side === 'right') {
+    const menu = document.getElementById('others-menu-right');
+    menu.style.display = (menu.style.display === 'flex') ? 'none' : 'flex';
+  }
+}
+
+/* ★ 追加：タイプに応じたバー（通常ストリップ両端の細バー）クラス名を返す */
+function getBarClassByType(t) {
+  switch (t) {
+    case 'ARR':      return 'orange-bar';
+    case 'DEP':      return 'green-bar';
+    case 'OVR':      return 'ovr-bar';
+    case 'IFR ARR':  return 'ifr-arr-bar';
+    case 'IFR DEP':  return 'ifr-dep-bar';
+    default:         return 'green-bar'; // 不明時はDEP相当でフォールバック
+  }
+}
+
+/* ★ 追加：予定機（簡易ストリップ）で左右に出す細バーのテンプレ（inline色） */
+function getPlanBarsByType(t) {
+  const color =
+    (t === 'ARR')     ? '#FFA500' :
+    (t === 'DEP')     ? '#32CD32' :
+    (t === 'OVR')     ? '#90EE90' :
+    (t === 'IFR ARR') ? '#FFE08A' :
+    (t === 'IFR DEP') ? '#66CCFF' : '#32CD32';
+  return `
+    <div style="position:absolute;left:0;top:0;bottom:0;width:8px;background-color:${color};"></div>
+    <div style="position:absolute;right:0;top:0;bottom:0;width:8px;background-color:${color};"></div>
+  `;
+}
+
+
+</script>
