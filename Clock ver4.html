@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>カスタムスタート時計 + QNH（初期値設定＋色変化）</title>
+  <style>
+    body {
+      background-color: black;
+      color: orange;
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+
+    .time-inputs {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+
+    .time-inputs label {
+      margin: 0 10px;
+    }
+
+    .time-inputs input {
+      font-size: 24px;
+      width: 60px;
+      text-align: center;
+    }
+
+    #qnhInput {
+      width: 80px;
+      font-size: 24px;
+      margin-left: 10px;
+    }
+
+    .button-group {
+      margin-top: 10px;
+      display: inline-flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .button-group button {
+      font-size: 20px;
+      padding: 10px 15px;
+    }
+
+    #display {
+      font-size: 150px;
+      margin-top: 40px;
+      font-weight: bold;
+    }
+
+    #seconds {
+      font-size: 120px;
+    }
+
+    #qnhDisplay {
+      margin-top: 20px;
+      font-size: 80px;
+      font-weight: bold;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>カスタムスタート時計</h1>
+
+  <div class="time-inputs">
+    <label><input type="number" id="hourInput" value="0" min="0" max="23">時</label>
+    <label><input type="number" id="minuteInput" value="0" min="0" max="59">分</label>
+    <label><input type="number" id="secondInput" value="0" min="0" max="59">秒</label>
+    <label>QNH初期値<input type="number" id="qnhInput" value="2992" min="2800" max="3200"></label>
+  </div>
+
+  <div class="button-group">
+    <button onclick="startClock()">スタート</button>
+    <button onclick="stopClock()">ストップ</button>
+    <button onclick="resetClock()">リセット</button>
+    <button id="speedButton" onclick="toggleSpeed()">2倍速</button>
+  </div>
+
+  <div id="display">
+    <span id="hoursMinutes">00:00</span><span id="seconds">:00</span>
+  </div>
+
+  <div id="qnhDisplay">2992</div>
+
+  <audio id="beepSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+
+  <script>
+    let timer = null;
+    let current = 0;
+    let isRunning = false;
+    let hasStarted = false;
+    let isDoubleSpeed = false;
+    let qnh = 2992;
+
+    function getStartTimeInSeconds() {
+      const h = parseInt(document.getElementById('hourInput').value, 10) || 0;
+      const m = parseInt(document.getElementById('minuteInput').value, 10) || 0;
+      const s = parseInt(document.getElementById('secondInput').value, 10) || 0;
+      return h * 3600 + m * 60 + s;
+    }
+
+    function updateDisplay() {
+      const h = String(Math.floor(current / 3600)).padStart(2, '0');
+      const m = String(Math.floor((current % 3600) / 60)).padStart(2, '0');
+      const s = String(current % 60).padStart(2, '0');
+      document.getElementById('hoursMinutes').textContent = `${h}:${m}`;
+      document.getElementById('seconds').textContent = `:${s}`;
+    }
+
+    function startClock() {
+      if (isRunning) return;
+      if (!hasStarted) {
+        current = getStartTimeInSeconds();
+        const userQNH = parseInt(document.getElementById('qnhInput').value, 10);
+        if (!isNaN(userQNH) && userQNH >= 2800 && userQNH <= 3200) {
+          qnh = userQNH;
+        } else {
+          qnh = 2992;
+        }
+        updateQNHDisplay(false);
+        hasStarted = true;
+      }
+      updateDisplay();
+      isRunning = true;
+      startTimerInterval();
+    }
+
+    function startTimerInterval() {
+      const interval = isDoubleSpeed ? 500 : 1000;
+      timer = setInterval(() => {
+        current++;
+        updateDisplay();
+        checkQNHUpdate();
+      }, interval);
+    }
+
+    function stopClock() {
+      clearInterval(timer);
+      timer = null;
+      isRunning = false;
+    }
+
+    function resetClock() {
+      stopClock();
+      current = 0;
+      hasStarted = false;
+      isDoubleSpeed = false;
+      document.getElementById('speedButton').textContent = "2倍速";
+      updateDisplay();
+    }
+
+    function toggleSpeed() {
+      if (!isRunning) return;
+      clearInterval(timer);
+      isDoubleSpeed = !isDoubleSpeed;
+      document.getElementById('speedButton').textContent = isDoubleSpeed ? "等倍速に戻す" : "2倍速";
+      startTimerInterval();
+    }
+
+    function generateQNH() {
+      const delta = (Math.random() < 0.5 ? -1 : 1) * (Math.floor(Math.random() * 2) + 1);
+      return qnh + delta;
+    }
+
+    function updateQNHDisplay(changed) {
+      const qnhEl = document.getElementById("qnhDisplay");
+      qnhEl.textContent = qnh;
+      if (changed) {
+        qnhEl.style.color = "yellow";
+        setTimeout(() => { qnhEl.style.color = "white"; }, 10000);
+      } else {
+        qnhEl.style.color = "white";
+      }
+    }
+
+    function playBeep() {
+      const beep = document.getElementById('beepSound');
+      beep.volume = 0.2;
+      beep.play();
+    }
+
+    function checkQNHUpdate() {
+      const minutes = Math.floor((current % 3600) / 60);
+      const seconds = current % 60;
+      const isTimeToUpdate = (minutes === 0 || minutes === 30) && seconds === 0;
+      const isRareChance = Math.random() < 1 / 10800;
+      if (isTimeToUpdate || isRareChance) {
+        const newQNH = generateQNH();
+        if (newQNH < 2992) {
+          playBeep();
+        }
+        qnh = newQNH;
+        updateQNHDisplay(true);
+      }
+    }
+  </script>
+</body>
+</html>
